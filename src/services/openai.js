@@ -1,5 +1,8 @@
 import OpenAI from 'openai';
 
+// Use Vercel API proxy in production, direct calls in development
+const API_BASE = import.meta.env.PROD ? '/api/openai-proxy' : 'http://localhost:3001/api/openai';
+
 export const createOpenAIClient = (apiKey) => {
     return new OpenAI({
         apiKey: apiKey,
@@ -13,6 +16,22 @@ export const transcribeAudio = async (audioBlob, apiKey) => {
         formData.append('file', audioBlob, 'audio.wav');
         formData.append('model', 'whisper-1');
 
+        // Use proxy in production
+        if (import.meta.env.PROD) {
+            const response = await fetch(API_BASE, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    endpoint: '/audio/transcriptions',
+                    apiKey,
+                    body: { model: 'whisper-1', file: audioBlob }
+                })
+            });
+            const data = await response.json();
+            return data.text;
+        }
+
+        // Direct call in development
         const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
             method: 'POST',
             headers: {
