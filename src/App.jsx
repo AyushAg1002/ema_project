@@ -307,7 +307,16 @@ function App() {
               <CustomerDashboard
                 claims={claims}
                 onUploadDoc={handleDocUpload}
-                onNewClaim={() => { setStep('intake'); setView('intake'); }}
+                onNewClaim={() => {
+                  setSelectedClaimId(null)
+                  setStep('intake')
+                  setView('intake')
+                }}
+                selectedClaimId={selectedClaimId}
+                onSelectClaim={(claim) => {
+                  setSelectedClaimId(claim.id)
+                  setClaimData(claim)
+                }}
                 intakeMode={intakeMode}
                 setIntakeMode={setIntakeMode}
                 apiKey={apiKey}
