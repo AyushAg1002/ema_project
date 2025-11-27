@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import IntakeForm from './components/IntakeForm'
 import ProcessingView from './components/ProcessingView'
 import ClaimBrief from './components/ClaimBrief'
 import VoiceIntake from './components/VoiceIntake'
@@ -16,7 +15,6 @@ function App() {
   const [step, setStep] = useState('intake') // intake, processing, brief
   const [claimData, setClaimData] = useState(null)
   const [apiKey, setApiKey] = useState(import.meta.env.VITE_OPENAI_API_KEY || '')
-  const [intakeMode, setIntakeMode] = useState('form') // form, voice
 
   const [claims, setClaims] = useState([])
   const [role, setRole] = useState('customer') // customer, company
@@ -317,8 +315,6 @@ function App() {
                   setSelectedClaimId(claim.id)
                   setClaimData(claim)
                 }}
-                intakeMode={intakeMode}
-                setIntakeMode={setIntakeMode}
                 apiKey={apiKey}
                 setApiKey={setApiKey}
                 handleNewClaim={handleNewClaim}
@@ -330,28 +326,13 @@ function App() {
                 {step === 'intake' && (
                   <div className="card fade-in">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                      <h2>FNOL Intake Agent</h2>
+                      <h2>FNOL Voice Assistant</h2>
                       <button className="btn btn-secondary" onClick={() => setView('dashboard')} style={{ fontSize: '0.875rem' }}>
                         Cancel
                       </button>
                     </div>
 
-                    <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '1rem', justifyContent: 'center' }}>
-                      <button
-                        className={`btn ${intakeMode === 'form' ? 'btn-primary' : 'btn-secondary'}`}
-                        onClick={() => setIntakeMode('form')}
-                      >
-                        Form Intake
-                      </button>
-                      <button
-                        className={`btn ${intakeMode === 'voice' ? 'btn-primary' : 'btn-secondary'}`}
-                        onClick={() => setIntakeMode('voice')}
-                      >
-                        Voice Assistant
-                      </button>
-                    </div>
-
-                    {intakeMode === 'voice' && !apiKey && (
+                    {!apiKey && (
                       <div style={{ marginBottom: '1.5rem' }}>
                         <label className="label">OpenAI API Key (Required for Voice)</label>
                         <input
@@ -364,19 +345,15 @@ function App() {
                       </div>
                     )}
 
-                    {intakeMode === 'form' ? (
-                      <IntakeForm onSubmit={handleNewClaim} />
+                    {apiKey ? (
+                      <VoiceIntake
+                        apiKey={apiKey}
+                        onComplete={handleNewClaim}
+                      />
                     ) : (
-                      apiKey ? (
-                        <VoiceIntake
-                          apiKey={apiKey}
-                          onComplete={handleNewClaim}
-                        />
-                      ) : (
-                        <div style={{ textAlign: 'center', padding: '2rem', color: 'hsl(var(--color-text-muted))' }}>
-                          Please enter an OpenAI API Key to use the Voice Assistant.
-                        </div>
-                      )
+                      <div style={{ textAlign: 'center', padding: '2rem', color: 'hsl(var(--color-text-muted))' }}>
+                        Please enter an OpenAI API Key to use the Voice Assistant.
+                      </div>
                     )}
                   </div>
                 )}

@@ -3,7 +3,7 @@ import VoiceIntake from './VoiceIntake'
 import CustomerNotifications from './CustomerNotifications'
 import Sidebar from './Sidebar'
 
-export default function CustomerDashboard({ claims, onUploadDoc, onNewClaim, intakeMode, setIntakeMode, apiKey, setApiKey, handleNewClaim, selectedClaimId, onSelectClaim }) {
+export default function CustomerDashboard({ claims, onUploadDoc, onNewClaim, apiKey, setApiKey, handleNewClaim, selectedClaimId, onSelectClaim }) {
     // Use selectedClaimId from props, or find first active claim
     const activeClaim = selectedClaimId
         ? claims.find(c => c.id === selectedClaimId)
