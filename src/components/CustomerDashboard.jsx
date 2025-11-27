@@ -94,55 +94,98 @@ export default function CustomerDashboard({ claims, onUploadDoc, onNewClaim, int
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
                         {/* Action Required / Doc Center */}
                         <div className="card fade-in" style={{
-                            border: pendingActions.length > 0 ? '2px solid hsl(var(--color-warning))' : 'none',
-                            backgroundColor: pendingActions.length > 0 ? 'hsl(var(--color-warning) / 0.05)' : 'hsl(var(--color-surface))'
+                            backgroundColor: activeClaim.missingInfo?.length > 0 ? 'hsl(var(--color-warning) / 0.05)' : 'hsl(var(--color-surface))',
+                            border: activeClaim.missingInfo?.length > 0 ? '2px solid hsl(var(--color-warning))' : '1px solid hsl(var(--color-text-light) / 0.1)'
                         }}>
-                            <h3 style={{
-                                color: pendingActions.length > 0 ? 'hsl(var(--color-warning))' : 'hsl(var(--color-text))',
-                                marginBottom: '1rem',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.5rem'
-                            }}>
-                                {pendingActions.length > 0 ? '⚠️ Action Required' : '✅ Documents'}
-                            </h3>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                                {activeClaim.missingInfo?.length > 0 && <span style={{ fontSize: '1.5rem' }}>⚠️</span>}
+                                <h3 style={{ margin: 0 }}>Document Upload Center</h3>
+                            </div>
 
-                            {pendingActions.length > 0 ? (
+                            {activeClaim.missingInfo && activeClaim.missingInfo.length > 0 ? (
                                 <>
-                                    <p style={{ marginBottom: '1rem', fontSize: '0.9rem' }}>Please upload the following documents to proceed:</p>
-                                    {pendingActions.map(item => (
-                                        <div key={item} style={{
-                                            display: 'flex',
-                                            justifyContent: 'space-between',
-                                            alignItems: 'center',
-                                            padding: '1rem',
-                                            backgroundColor: 'hsl(var(--color-background))',
-                                            borderRadius: 'var(--radius-md)',
-                                            marginBottom: '0.5rem',
-                                            boxShadow: 'var(--shadow-sm)'
-                                        }}>
-                                            <span style={{ fontWeight: '500', fontSize: '0.9rem' }}>
-                                                {item === 'accident_photo' ? 'Photo of Accident Damage' :
-                                                    item === 'police_report' ? 'Police Report' : item}
-                                            </span>
-                                            <button
-                                                className="btn btn-primary"
-                                                onClick={() => onUploadDoc(activeClaim.id, item)}
-                                                style={{ fontSize: '0.75rem', padding: '0.4rem 0.8rem' }}
-                                            >
-                                                Upload
-                                            </button>
-                                        </div>
-                                    ))}
+                                    <p style={{ marginBottom: '1.5rem', color: 'hsl(var(--color-warning))' }}>
+                                        <strong>Action Required:</strong> Please upload the following documents to proceed with your claim.
+                                    </p>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                        {activeClaim.missingInfo.map((docType, idx) => {
+                                            const isUploaded = activeClaim.documents?.includes(docType)
+                                            const evaluation = activeClaim.documentEvaluations?.find(e => e.docType === docType)
+
+                                            return (
+                                                <div key={idx} style={{
+                                                    padding: '1rem',
+                                                    backgroundColor: 'hsl(var(--color-background))',
+                                                    borderRadius: 'var(--radius-md)',
+                                                    border: `1px solid ${isUploaded ? 'hsl(var(--color-success))' : 'hsl(var(--color-text-light) / 0.2)'}`
+                                                }}>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                                                        <span style={{ fontWeight: '600' }}>{docType}</span>
+                                                        {isUploaded && (
+                                                            <span style={{
+                                                                fontSize: '0.75rem',
+                                                                padding: '0.25rem 0.75rem',
+                                                                borderRadius: 'var(--radius-sm)',
+                                                                backgroundColor: evaluation?.status === 'validated' ? 'hsl(var(--color-success))' :
+                                                                    evaluation?.status === 'mismatch' ? 'hsl(var(--color-warning))' :
+                                                                        'hsl(var(--color-primary))',
+                                                                color: 'white',
+                                                                fontWeight: '600'
+                                                            }}>
+                                                                {evaluation?.status === 'validated' ? '✓ Validated' :
+                                                                    evaluation?.status === 'mismatch' ? '⚠ Mismatch' :
+                                                                        '✓ Uploaded'}
+                                                            </span>
+                                                        )}
+                                                    </div>
+
+                                                    {evaluation && evaluation.mismatches && evaluation.mismatches.length > 0 && (
+                                                        <div style={{
+                                                            padding: '0.75rem',
+                                                            backgroundColor: 'hsl(var(--color-warning) / 0.1)',
+                                                            borderRadius: 'var(--radius-sm)',
+                                                            marginBottom: '0.75rem'
+                                                        }}>
+                                                            <div style={{ fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem', color: 'hsl(var(--color-warning))' }}>
+                                                                ⚠ Issues Detected:
+                                                            </div>
+                                                            {evaluation.mismatches.map((m, i) => (
+                                                                <div key={i} style={{ fontSize: '0.8rem', marginBottom: '0.25rem' }}>
+                                                                    • {m.type.replace(/_/g, ' ')}: {m.claimed} vs {m.detected}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+
+                                                    {!isUploaded && (
+                                                        <input
+                                                            type="file"
+                                                            accept="image/*,application/pdf"
+                                                            onChange={(e) => {
+                                                                if (e.target.files && e.target.files[0]) {
+                                                                    onUploadDoc(activeClaim.id, docType, e.target.files[0])
+                                                                }
+                                                            }}
+                                                            style={{
+                                                                width: '100%',
+                                                                padding: '0.5rem',
+                                                                borderRadius: 'var(--radius-sm)',
+                                                                border: '1px solid hsl(var(--color-text-light) / 0.3)',
+                                                                cursor: 'pointer'
+                                                            }}
+                                                        />
+                                                    )}
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
                                 </>
                             ) : (
-                                <div style={{ textAlign: 'center', padding: '2rem', color: 'hsl(var(--color-text-muted))' }}>
-                                    <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🎉</div>
-                                    All required documents submitted.
-                                </div>
+                                <p style={{ color: 'hsl(var(--color-text-muted))' }}>
+                                    ✓ All required documents have been submitted.
+                                </p>
                             )}
                         </div>
-
                         {/* Live Details Summary (Read-Only) */}
                         <div className="card fade-in">
                             <h3 style={{ marginBottom: '1rem' }}>Claim Details</h3>

@@ -65,6 +65,41 @@ app.post('/api/report', async (req, res) => {
     }
 });
 
+// Proxy endpoint for OpenAI Vision API
+app.post('/api/vision', async (req, res) => {
+    try {
+        const { image, prompt, apiKey } = req.body;
+
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: 'gpt-4o',
+                messages: [
+                    {
+                        role: 'user',
+                        content: [
+                            { type: 'text', text: prompt },
+                            { type: 'image_url', image_url: { url: image } }
+                        ]
+                    }
+                ],
+                response_format: { type: "json_object" },
+                max_tokens: 1000
+            })
+        });
+
+        const data = await response.json();
+        res.json(data);
+    } catch (error) {
+        console.error('Vision API Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`✅ Backend server running on http://localhost:${PORT}`);
     console.log(`Frontend can now make API calls through this server`);

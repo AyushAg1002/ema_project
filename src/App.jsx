@@ -88,37 +88,68 @@ function App() {
     }
   }
 
-  const handleDocUpload = async (claimId, docType) => {
+  const handleDocUpload = async (claimId, docType, file) => {
     const claim = claims.find(c => c.id === claimId)
     if (!claim) return
 
-    const updatedDocs = [...(claim.documents || []), docType]
+    try {
+      // Agent 5: Document Evaluation Agent
+      const { evaluateDocument } = await import('./services/documentEvaluator')
+      const evaluation = await evaluateDocument(file, docType, claim, apiKey)
 
-    // Agent 4: Document Request Agent -> Triggers Re-evaluation
-    const updatedClaimData = { ...claim, documents: updatedDocs }
-    const triageResult = analyzeClaim(updatedClaimData)
+      console.log('Document evaluation result:', evaluation)
 
-    const finalClaim = {
-      ...updatedClaimData,
-      ...triageResult,
-      status: triageResult.status,
-      nextSteps: triageResult.nextSteps
-    }
+      // Update claim with document and evaluation
+      const updatedDocs = [...(claim.documents || []), docType]
+      const updatedEvaluations = [...(claim.documentEvaluations || []), evaluation]
 
-    // Update Supabase
-    const { error } = await supabase
-      .from('claims')
-      .update({
+      // Agent 4: Document Request Agent -> Triggers Re-evaluation
+      const updatedClaimData = {
+        ...claim,
         documents: updatedDocs,
-        status: finalClaim.status,
-        missing_info: finalClaim.missingInfo
-      })
-      .eq('id', claimId)
+        documentEvaluations: updatedEvaluations,
+        // If AI detected different severity, use it for re-triage
+        ...(evaluation.aiAnalysis?.detectedSeverity && {
+          aiDetectedSeverity: evaluation.aiAnalysis.detectedSeverity
+        })
+      }
 
-    if (error) {
-      console.error('Error updating claim:', error)
-    } else {
-      setClaims(prev => prev.map(c => c.id === claimId ? finalClaim : c))
+      const triageResult = analyzeClaim(updatedClaimData)
+
+      const finalClaim = {
+        ...updatedClaimData,
+        ...triageResult,
+        status: triageResult.status,
+        nextSteps: triageResult.nextSteps,
+        // Add mismatch flags if any
+        mismatchFlags: evaluation.mismatches?.map(m => m.type) || []
+      }
+
+      // Update Supabase
+      const { error } = await supabase
+        .from('claims')
+        .update({
+          documents: updatedDocs,
+          document_evaluations: updatedEvaluations,
+          ai_detected_severity: evaluation.aiAnalysis?.detectedSeverity || null,
+          mismatch_flags: finalClaim.mismatchFlags,
+          status: finalClaim.status,
+          missing_info: finalClaim.missingInfo
+        })
+        .eq('id', claimId)
+
+      if (error) {
+        console.error('Error updating claim:', error)
+        alert('Failed to save document evaluation')
+      } else {
+        setClaims(prev => prev.map(c => c.id === claimId ? finalClaim : c))
+        alert(evaluation.status === 'validated' ? 'Document validated successfully!' :
+          evaluation.status === 'mismatch' ? 'Document uploaded but mismatches detected' :
+            'Document uploaded')
+      }
+    } catch (error) {
+      console.error('Error evaluating document:', error)
+      alert('Failed to evaluate document. Please try again.')
     }
   }
 
