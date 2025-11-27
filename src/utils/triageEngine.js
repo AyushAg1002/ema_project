@@ -6,10 +6,11 @@
 
 import eventBus, { EventTypes, ClaimStatus, AgentActors, createStatusUpdateEvent } from '../services/eventBus'
 
-export function analyzeClaim(claim) {
+export function analyzeClaim(claim, allClaims = []) {
     console.log('🤖 AGENT 2: Starting triage analysis for claim:', claim.id)
     // Agent 2: Triage Decision Logic
     // Inputs: claim (from FNOL Agent) containing AI extracted fields
+    // allClaims: All claims from database for historical analysis
 
     const claimData = claim // Alias for compatibility with existing logic
 
@@ -43,74 +44,48 @@ export function analyzeClaim(claim) {
 
     // 2. Determine Triage Decision (Fast Track / Standard / Flagged)
 
-    // Mock History Check
-    const suspiciousUsers = ['user_123', 'repeat_offender']
-    if (suspiciousUsers.includes(claimData.userId)) {
-        fraudSignal = true
-        claimData.fraudReasoning = 'User flagged in historical claims database.'
+    // Historical User Check (using real data from allClaims)
+    if (claimData.userId && allClaims.length > 0) {
+        const userHistory = checkUserHistorySync(claimData.userId, allClaims)
+        if (userHistory.isSuspicious) {
+            fraudSignal = true
+            claimData.fraudReasoning = userHistory.reason
+            console.log(`🤖 AGENT 2: User history check - ${userHistory.reason}`)
+        }
     }
 
     // Priority: Fraud Signals -> Heavy Damage -> Injuries -> Fast Track
     if (fraudSignal) {
         decision = 'Flagged'
-        rationale = `🚨 ALARM: Risk Detected - ${claimData.fraudReasoning || 'Inconsistencies found.'}`
-        estimate = 'Under Investigation'
-    } else if (claimData.severity === 'Heavy' || claimData.severity === 'heavy') {
-        decision = 'Flagged'
-        rationale = '🚨 ALARM: Heavy damage reported. Potential total loss.'
-        estimate = '$5,000+'
-    } else if (claimData.injuries === 'Yes' || claimData.injuries === 'yes') {
+        rationale = `🚨 ALARM: Risk Detected - ${claimData.fraudReasoning || 'Suspicious patterns detected'}`
+        status = 'Flagged'
+    } else if (claimData.severity === 'Heavy' || claimData.severity === 'Severe') {
         decision = 'Standard'
-        rationale = 'Injuries reported. Medical review required.'
-        estimate = 'Pending Medical'
-    } else if (claimData.drivable === 'Yes' && claimData.severity === 'Minor') {
+        rationale = 'Heavy damage requires thorough inspection.'
+        status = 'Under Review'
+    } else if (claimData.injuries === 'Yes') {
+        decision = 'Standard'
+        rationale = 'Injuries reported. Requires medical review.'
+        status = 'Under Review'
+    } else if (missingInfo.length === 0 && claimData.severity === 'Minor') {
         decision = 'Fast Track'
-        rationale = 'Drivable vehicle with minor damage. Qualifies for automated processing.'
-        estimate = '$300 - $800'
-    } else {
-        // AI Recommendation Fallback
-        if (claimData.recommendedAction?.includes('Fast Track')) {
-            decision = 'Fast Track'
-            rationale = claimData.reasoning || 'AI recommended Fast Track based on low complexity.'
-        } else {
-            decision = 'Standard'
-            rationale = claimData.reasoning || 'Standard claim complexity.'
-        }
+        rationale = 'Low complexity claim. All information provided.'
+        status = 'Fast Track'
     }
 
-    // 3. Status Update
-    let eventStatus = ClaimStatus.UNDER_REVIEW
-
-    if (fraudSignal) {
-        eventStatus = ClaimStatus.UNDER_SIU_REVIEW
-        status = 'Under SIU Review'
-    } else if (missingInfo.length > 0) {
-        status = 'Waiting for Info'
-        eventStatus = ClaimStatus.AWAITING_DOCUMENTS
-
-        // Add specific next steps for missing docs
-        missingInfo.forEach(doc => {
-            const docName = doc.replace('_', ' ')
-            if (!nextSteps.includes(`Request ${docName}`)) {
-                nextSteps.unshift(`Request ${docName}`)
-
-                // Emit DocumentRequest Event (Agent 4)
-                eventBus.publish({
-                    eventType: EventTypes.DOCUMENT_REQUEST,
-                    correlationId: claim.id,
-                    documentType: doc,
-                    timestamp: new Date().toISOString(),
-                    actor: AgentActors.DOCUMENT_REQUEST
-                })
-                console.log(`📤 AGENT 4: Requested document: ${doc}`)
-            }
+    // Emit DocumentRequest events for missing info (Agent 4)
+    if (missingInfo.length > 0) {
+        status = 'Pending Info'
+        missingInfo.forEach(docType => {
+            eventBus.publish({
+                eventType: EventTypes.DOCUMENT_REQUEST,
+                correlationId: claim.id,
+                documentType: docType,
+                timestamp: new Date().toISOString(),
+                actor: AgentActors.DOCUMENT_REQUEST
+            })
+            console.log(`📤 AGENT 4: Emitted DocumentRequest for ${docType}`)
         })
-    } else if (decision === 'Fast Track') {
-        status = 'Approved'
-        eventStatus = ClaimStatus.FAST_TRACK_RECOMMENDED
-    } else {
-        status = 'Under Review'
-        eventStatus = ClaimStatus.UNDER_REVIEW
     }
 
     const result = {
@@ -120,8 +95,15 @@ export function analyzeClaim(claim) {
         status,
         missingInfo,
         fraudSignal,
-        nextSteps
+        fraudRisk: fraudSignal ? 'High' : 'Low',
+        nextSteps: nextSteps.length > 0 ? nextSteps : ['Review claim details', 'Verify incident report']
     }
+
+    // Map to ClaimStatus enum for event
+    let eventStatus = ClaimStatus.PROCESSING
+    if (status === 'Flagged') eventStatus = ClaimStatus.FLAGGED
+    else if (status === 'Pending Info') eventStatus = ClaimStatus.AWAITING_DOCUMENTS
+    else if (status === 'Fast Track') eventStatus = ClaimStatus.FAST_TRACK
 
     // Emit TriageResult Event
     eventBus.publish({
@@ -141,7 +123,52 @@ export function analyzeClaim(claim) {
         { decision, missingInfo }
     )
     eventBus.publish(statusEvent)
-    console.log('📤 AGENT 2: Emitted status update:', statusEvent)
+    console.log('📤 AGENT 2: Emitted TriageResult and ClaimStatusUpdated events')
 
     return result
+}
+
+/**
+ * Synchronous helper to check user history from allClaims array
+ * (Simplified version of historicalLookup.checkUserHistory)
+ */
+function checkUserHistorySync(userId, allClaims) {
+    if (!userId || !allClaims) {
+        return { isSuspicious: false, reason: '', pastClaimCount: 0 }
+    }
+
+    // Find claims by this user
+    const userClaims = allClaims.filter(c => {
+        const data = c.extracted_data || {}
+        return data.userId === userId || c.id.includes(userId)
+    })
+
+    const pastClaimCount = userClaims.length
+
+    // Check for suspicious patterns
+    if (pastClaimCount >= 3) {
+        const flaggedCount = userClaims.filter(c => c.decision === 'Flagged').length
+        if (flaggedCount >= 2) {
+            return {
+                isSuspicious: true,
+                reason: `User has ${pastClaimCount} past claims, ${flaggedCount} were flagged`,
+                pastClaimCount
+            }
+        }
+    }
+
+    // Check for high frequency (3+ claims in last 6 months)
+    const sixMonthsAgo = new Date()
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
+    const recentClaims = userClaims.filter(c => new Date(c.created_at) > sixMonthsAgo)
+
+    if (recentClaims.length >= 3) {
+        return {
+            isSuspicious: true,
+            reason: `${recentClaims.length} claims in last 6 months (high frequency)`,
+            pastClaimCount
+        }
+    }
+
+    return { isSuspicious: false, reason: '', pastClaimCount }
 }

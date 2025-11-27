@@ -104,8 +104,8 @@ function App() {
       transcript: data.transcript || []
     }
 
-    // Agent 2: Triage Decision Agent
-    const triageResult = analyzeClaim(baseClaim)
+    // Agent 2: Triage Decision (with historical lookup)
+    const triageResult = analyzeClaim(baseClaim, claims)
 
     // Agent 3: Report & Next-Step Agent (Simulated by combining data)
     // Also calculates Settlement Estimate
