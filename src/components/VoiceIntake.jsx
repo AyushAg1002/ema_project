@@ -70,6 +70,7 @@ export default function VoiceIntake({ apiKey, onComplete }) {
             // Handle JSON response
             const aiResponse = result.response || "I'm having trouble connecting."
             const newExtracted = result.extracted
+            const isComplete = result.is_complete || false
 
             if (newExtracted) {
                 setExtractedData(prev => ({ ...prev, ...newExtracted }))
@@ -81,8 +82,8 @@ export default function VoiceIntake({ apiKey, onComplete }) {
             // Speak Response
             speak(aiResponse)
 
-            // Check for completion phrase to auto-trigger report
-            if (aiResponse.toLowerCase().includes("generating the report")) {
+            // Auto-trigger report if AI signals completion
+            if (isComplete) {
                 setTimeout(() => handleGenerateReport(updatedMessages), 2000)
             }
 
@@ -158,6 +159,7 @@ export default function VoiceIntake({ apiKey, onComplete }) {
                         // Handle JSON response
                         const aiResponse = result.response || "I'm having trouble connecting."
                         const newExtracted = result.extracted
+                        const isComplete = result.is_complete || false
 
                         if (newExtracted) {
                             setExtractedData(prev => ({ ...prev, ...newExtracted }))
@@ -169,8 +171,8 @@ export default function VoiceIntake({ apiKey, onComplete }) {
                         // Speak Response
                         speak(aiResponse)
 
-                        // Check for completion phrase to auto-trigger report
-                        if (aiResponse.toLowerCase().includes("generating the report")) {
+                        // Auto-trigger report if AI signals completion
+                        if (isComplete) {
                             setTimeout(() => handleGenerateReport(updatedMessages), 2000)
                         }
 

@@ -60,10 +60,16 @@ export async function generateResponse(messages, apiKey) {
     - Confirm critical details (e.g., "Just to confirm, this happened at the intersection of Main and 5th Street, correct?")
     - Keep responses concise and focused
     
+    COMPLETION DETECTION:
+    - Once you have collected AT LEAST: Incident Type, Location, Description of what happened, and Injury status, set "is_complete" to true
+    - When setting is_complete to true, your response should acknowledge you have the information and inform them the report is being generated
+    - Example: "Thank you, I have all the information I need. I'm generating your claim report now."
+    
     RESPONSE FORMAT:
     Return JSON with:
     {
       "response": "Your professional, detail-oriented response",
+      "is_complete": true or false,
       "extracted": {
         "incidentType": "Specific type" or null,
         "dateTime": "Date and time" or null,
