@@ -21,6 +21,7 @@ function App() {
   const [claims, setClaims] = useState([])
   const [role, setRole] = useState('customer') // customer, company
   const [view, setView] = useState('dashboard') // dashboard, intake, workspace
+  const [selectedClaimId, setSelectedClaimId] = useState(null) // For customer sidebar navigation
 
   // Fetch claims on load
   useEffect(() => {

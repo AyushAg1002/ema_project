@@ -4,6 +4,7 @@ import ClaimBrief from './ClaimBrief'
 
 export default function CompanyDashboard({ claims }) {
     const [activeView, setActiveView] = useState('dashboard')
+    const role = 'company' // Company dashboard always shows agents
 
     const totalClaims = claims.length
     const pendingInfoCount = claims.filter(c => c.status === 'Pending Info').length
@@ -162,7 +163,7 @@ export default function CompanyDashboard({ claims }) {
         const agent = agentDetails[activeView]
         return (
             <div style={{ display: 'flex', height: 'calc(100vh - 80px)', margin: '-2rem -2rem -2rem -2rem' }}>
-                <Sidebar activeView={activeView} onViewChange={setActiveView} />
+                <Sidebar activeView={activeView} onViewChange={setActiveView} role={role} />
                 <div style={{ flex: 1, padding: '3rem', overflowY: 'auto', backgroundColor: 'hsl(var(--color-background))' }}>
                     <div className="card fade-in" style={{ maxWidth: '800px', margin: '0 auto' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
@@ -229,7 +230,7 @@ export default function CompanyDashboard({ claims }) {
 
     return (
         <div style={{ display: 'flex', height: 'calc(100vh - 80px)', margin: '-2rem -2rem -2rem -2rem' }}>
-            <Sidebar activeView={activeView} onViewChange={setActiveView} />
+            <Sidebar activeView={activeView} onViewChange={setActiveView} role={role} />
 
             <div style={{ flex: 1, padding: '2rem', overflowY: 'auto', backgroundColor: 'hsl(var(--color-background))' }}>
                 <div style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
