@@ -1,9 +1,13 @@
 export default function Sidebar({ activeView, onViewChange }) {
     const menuItems = [
-        { id: 'dashboard', label: 'Dashboard', icon: '📊' },
-        { id: 'claims', label: 'All Claims', icon: '📑' },
-        { id: 'documents', label: 'Document Centre', icon: '📁' },
-        { id: 'settings', label: 'Settings', icon: '⚙️' },
+        { id: 'dashboard', label: 'Overview', icon: '📊' },
+        { id: 'agent1', label: 'Agent 1: FNOL Intake', icon: '🤖' },
+        { id: 'agent2', label: 'Agent 2: Triage Decision', icon: '🤖' },
+        { id: 'agent3', label: 'Agent 3: Report & Next-Step', icon: '🤖' },
+        { id: 'agent4', label: 'Agent 4: Document Request', icon: '🤖' },
+        { id: 'agent5', label: 'Agent 5: Doc Evaluation', icon: '🤖' },
+        { id: 'agent6', label: 'Agent 6: Customer Update', icon: '🤖' },
+        { id: 'agent7', label: 'Agent 7: Journey Analytics', icon: '📊' },
     ]
 
     return (

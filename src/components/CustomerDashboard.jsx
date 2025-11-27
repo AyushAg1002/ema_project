@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import VoiceIntake from './VoiceIntake'
+import CustomerNotifications from './CustomerNotifications'
 
 export default function CustomerDashboard({ claims, onUploadDoc, onNewClaim, intakeMode, setIntakeMode, apiKey, setApiKey, handleNewClaim }) {
     const activeClaim = claims.find(c => c.status !== 'Closed')
@@ -17,6 +18,8 @@ export default function CustomerDashboard({ claims, onUploadDoc, onNewClaim, int
 
     return (
         <div className="container">
+            {activeClaim && <CustomerNotifications customerPseudonym={`cust-${activeClaim.id}`} />}
+
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                 <h2 style={{ fontSize: '1.5rem', fontWeight: '700' }}>My Claims</h2>
                 {!activeClaim && (
@@ -31,13 +34,45 @@ export default function CustomerDashboard({ claims, onUploadDoc, onNewClaim, int
                 <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '2rem' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
                         {/* Status Card */}
-                        <div className="card fade-in">
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                                <h3 style={{ margin: 0 }}>Claim #{activeClaim.id}</h3>
-                                <div className={`badge ${activeClaim.status === 'Approved' ? 'badge-success' : activeClaim.status === 'Flagged' ? 'badge-danger' : 'badge-warning'}`}>
-                                    {activeClaim.status}
+                        <div className="card fade-in" aria-live="polite">
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                                <div>
+                                    <h3 style={{ margin: '0 0 0.5rem 0' }}>Claim #{activeClaim.id}</h3>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <span style={{ color: 'hsl(var(--color-text-muted))', fontSize: '0.9rem' }}>Status:</span>
+                                        <span className={`badge ${activeClaim.status === 'Approved' ? 'badge-success' : activeClaim.status === 'Flagged' ? 'badge-danger' : 'badge-warning'}`} style={{ fontSize: '1rem' }}>
+                                            {activeClaim.status}
+                                        </span>
+                                    </div>
                                 </div>
+                                {activeClaim.lastUpdatedBy && (
+                                    <div style={{ textAlign: 'right' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                                            <span style={{ fontSize: '0.75rem', color: 'hsl(var(--color-text-muted))' }}>Updated by</span>
+                                            <span style={{ fontSize: '0.7rem', padding: '0.25rem 0.5rem', backgroundColor: 'hsl(var(--color-primary))', color: 'white', borderRadius: 'var(--radius-sm)', fontWeight: '600' }}>
+                                                🤖 {activeClaim.lastUpdatedBy.replace(' Agent', '').toUpperCase()}
+                                            </span>
+                                        </div>
+                                        <span style={{ fontSize: '0.75rem', color: 'hsl(var(--color-text-muted))' }}>
+                                            {new Date(activeClaim.lastUpdatedAt).toLocaleString()}
+                                        </span>
+                                    </div>
+                                )}
                             </div>
+
+                            {activeClaim.statusReason && (
+                                <div style={{
+                                    padding: '0.75rem',
+                                    backgroundColor: 'hsl(var(--color-background))',
+                                    borderRadius: 'var(--radius-sm)',
+                                    borderLeft: '3px solid hsl(var(--color-primary))',
+                                    marginBottom: '1.5rem'
+                                }}>
+                                    <p style={{ margin: 0, fontSize: '0.9rem', color: 'hsl(var(--color-text))' }}>
+                                        {activeClaim.statusReason}
+                                    </p>
+                                </div>
+                            )}
 
                             <div style={{ display: 'flex', justifyContent: 'space-between', position: 'relative', padding: '0 1rem' }}>
                                 {/* Progress Line */}
@@ -100,6 +135,7 @@ export default function CustomerDashboard({ claims, onUploadDoc, onNewClaim, int
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
                                 {activeClaim.missingInfo?.length > 0 && <span style={{ fontSize: '1.5rem' }}>⚠️</span>}
                                 <h3 style={{ margin: 0 }}>Document Upload Center</h3>
+                                <span style={{ fontSize: '0.7rem', padding: '0.25rem 0.5rem', backgroundColor: 'hsl(var(--color-success))', color: 'white', borderRadius: 'var(--radius-sm)', fontWeight: '600' }}>🤖 AGENT 4</span>
                             </div>
 
                             {activeClaim.missingInfo && activeClaim.missingInfo.length > 0 ? (

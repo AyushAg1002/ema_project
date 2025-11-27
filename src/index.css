@@ -1,29 +1,35 @@
 :root {
   /* Premium Color Palette - HSL */
-  --color-primary: 220 90% 56%; /* Vibrant Blue */
+  --color-primary: 220 90% 56%;
+  /* Vibrant Blue */
   --color-primary-dark: 220 90% 45%;
-  --color-secondary: 260 80% 60%; /* Purple Accent */
-  
-  --color-background: 220 30% 98%; /* Very light blue-grey */
-  --color-surface: 0 0% 100%; /* White */
+  --color-secondary: 260 80% 60%;
+  /* Purple Accent */
+
+  --color-background: 220 30% 98%;
+  /* Very light blue-grey */
+  --color-surface: 0 0% 100%;
+  /* White */
   --color-surface-hover: 220 20% 97%;
-  
-  --color-text-main: 220 40% 15%; /* Dark Blue Grey */
+
+  --color-text-main: 220 40% 15%;
+  /* Dark Blue Grey */
   --color-text-muted: 220 20% 40%;
   --color-text-light: 220 20% 60%;
-  
+
   --color-success: 150 80% 40%;
   --color-warning: 35 90% 55%;
   --color-danger: 0 80% 60%;
-  
+
   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
   --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -1px rgb(0 0 0 / 0.06);
   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -2px rgb(0 0 0 / 0.05);
-  
+
+  --radius-sm: 0.375rem;
   --radius-md: 0.5rem;
   --radius-lg: 0.75rem;
   --radius-xl: 1rem;
-  
+
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
@@ -46,7 +52,9 @@ button {
   font-family: inherit;
 }
 
-input, textarea, select {
+input,
+textarea,
+select {
   font-family: inherit;
 }
 
@@ -116,7 +124,9 @@ input, textarea, select {
   color: hsl(var(--color-text-main));
 }
 
-.input, .select, .textarea {
+.input,
+.select,
+.textarea {
   width: 100%;
   padding: 0.75rem;
   border-radius: var(--radius-md);
@@ -126,7 +136,9 @@ input, textarea, select {
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
-.input:focus, .select:focus, .textarea:focus {
+.input:focus,
+.select:focus,
+.textarea:focus {
   outline: none;
   border-color: hsl(var(--color-primary));
   box-shadow: 0 0 0 3px hsl(var(--color-primary) / 0.2);
@@ -137,6 +149,13 @@ input, textarea, select {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

@@ -7,6 +7,10 @@ import CustomerDashboard from './components/CustomerDashboard'
 import CompanyDashboard from './components/CompanyDashboard'
 import { analyzeClaim } from './utils/triageEngine'
 import { supabase } from './services/supabase'
+import eventBus, { EventTypes } from './services/eventBus'
+
+import { customerUpdateAgent } from './services/customerUpdateAgent'
+import { journeyAgent } from './services/journeyAgent'
 
 function App() {
   const [step, setStep] = useState('intake') // intake, processing, brief
@@ -21,6 +25,58 @@ function App() {
   // Fetch claims on load
   useEffect(() => {
     fetchClaims()
+    customerUpdateAgent.init()
+    journeyAgent.init()
+  }, [])
+
+  // Subscribe to claim status updates
+  useEffect(() => {
+    const unsubscribe = eventBus.subscribe(EventTypes.CLAIM_STATUS_UPDATED, (event) => {
+      console.log('📥 Received ClaimStatusUpdated event:', event)
+
+      // Update claim in state
+      setClaims(prevClaims => {
+        const claimIndex = prevClaims.findIndex(c => c.id === event.correlationId)
+        if (claimIndex === -1) return prevClaims
+
+        const updatedClaims = [...prevClaims]
+        const currentClaim = updatedClaims[claimIndex]
+
+        const newHistoryItem = {
+          status: event.status,
+          actor: event.actor,
+          timestamp: event.timestamp,
+          reason: event.reason
+        }
+
+        updatedClaims[claimIndex] = {
+          ...currentClaim,
+          status: event.status,
+          lastUpdatedBy: event.actor,
+          lastUpdatedAt: event.timestamp,
+          statusReason: event.reason,
+          statusHistory: [newHistoryItem, ...(currentClaim.statusHistory || [])]
+        }
+
+        return updatedClaims
+      })
+
+      // Also update in Supabase
+      supabase
+        .from('claims')
+        .update({
+          status: event.status,
+          last_updated_by: event.actor,
+          last_updated_at: event.timestamp,
+          status_reason: event.reason
+        })
+        .eq('id', event.correlationId)
+        .then(({ error }) => {
+          if (error) console.error('Error updating claim status in Supabase:', error)
+        })
+    })
+
+    return unsubscribe
   }, [])
 
   const fetchClaims = async () => {
@@ -51,14 +107,36 @@ function App() {
     const triageResult = analyzeClaim(baseClaim)
 
     // Agent 3: Report & Next-Step Agent (Simulated by combining data)
+    // Also calculates Settlement Estimate
+    const settlementEstimate = calculateSettlementEstimate(baseClaim, triageResult)
+
     const processedClaim = {
       ...baseClaim,
       ...triageResult,
       // Ensure these fields are top-level for the dashboard
       status: triageResult.status,
       nextSteps: triageResult.nextSteps,
-      fraudSignal: triageResult.fraudSignal
+      fraudSignal: triageResult.fraudSignal,
+      settlementEstimate
     }
+
+    // Emit SettlementEstimate event (Agent 3)
+    eventBus.publish({
+      eventType: 'SettlementEstimate',
+      correlationId: processedClaim.id,
+      estimateMin: settlementEstimate.min,
+      estimateMax: settlementEstimate.max,
+      currency: 'USD',
+      method: 'rule-based',
+      confidence: settlementEstimate.confidence,
+      inputs: {
+        inferredDamageSeverity: baseClaim.severity || 'unknown',
+        incidentType: baseClaim.incidentType
+      },
+      timestamp: new Date().toISOString(),
+      agentVersion: 'brief-v1.0'
+    })
+    console.log('📤 AGENT 3: Emitted SettlementEstimate:', settlementEstimate)
 
     // Persist to Supabase
     const { error } = await supabase.from('claims').insert([{
@@ -88,6 +166,49 @@ function App() {
     }
   }
 
+  // Settlement Estimate Calculator (Agent 3 helper)
+  function calculateSettlementEstimate(claim, triageResult) {
+    let min = 200
+    let max = 1000
+    let confidence = 0.7
+
+    // Base range by severity
+    const severity = claim.severity?.toLowerCase() || 'minor'
+    if (severity === 'minor') {
+      min = 200
+      max = 1000
+    } else if (severity === 'moderate') {
+      min = 1000
+      max = 3000
+    } else if (severity === 'heavy' || severity === 'severe') {
+      min = 3000
+      max = 10000
+    }
+
+    // Adjust for injuries
+    if (claim.injuries === 'Yes' || claim.injuries === 'yes') {
+      min *= 1.5
+      max *= 2
+      confidence -= 0.1
+    }
+
+    // Adjust for missing documents
+    if (triageResult.missingInfo && triageResult.missingInfo.length > 0) {
+      confidence -= 0.2
+    }
+
+    // Adjust for fraud signal
+    if (triageResult.fraudSignal) {
+      confidence = 0.3 // Low confidence for flagged claims
+    }
+
+    return {
+      min: Math.round(min),
+      max: Math.round(max),
+      confidence: Math.max(0.1, Math.min(1.0, confidence))
+    }
+  }
+
   const handleDocUpload = async (claimId, docType, file) => {
     const claim = claims.find(c => c.id === claimId)
     if (!claim) return
@@ -111,7 +232,9 @@ function App() {
         // If AI detected different severity, use it for re-triage
         ...(evaluation.aiAnalysis?.detectedSeverity && {
           aiDetectedSeverity: evaluation.aiAnalysis.detectedSeverity
-        })
+        }),
+        // Pass mismatch flags to Triage Engine so Agent 2/4 can re-request
+        mismatchFlags: evaluation.mismatches?.map(m => m.type) || []
       }
 
       const triageResult = analyzeClaim(updatedClaimData)
@@ -120,9 +243,7 @@ function App() {
         ...updatedClaimData,
         ...triageResult,
         status: triageResult.status,
-        nextSteps: triageResult.nextSteps,
-        // Add mismatch flags if any
-        mismatchFlags: evaluation.mismatches?.map(m => m.type) || []
+        nextSteps: triageResult.nextSteps
       }
 
       // Update Supabase
@@ -155,11 +276,11 @@ function App() {
 
   return (
     <div className={role === 'company' ? '' : 'container'} style={role === 'company' ? { padding: '2rem', height: '100vh', overflow: 'hidden' } : {}}>
-      <header style={{ marginBottom: '2rem', textAlign: 'center', position: 'relative' }}>
+      <header style={{ marginBottom: '2rem', textAlign: 'center', position: 'relative', paddingRight: '16rem' }}>
         <h1 style={{ fontSize: '1.5rem', fontWeight: '700', color: 'hsl(var(--color-primary))' }}>
           Ema Claims Triage Agent
         </h1>
-        <div style={{ position: 'absolute', right: role === 'company' ? '2rem' : 0, top: 0, display: 'flex', gap: '0.5rem' }}>
+        <div style={{ position: 'absolute', right: '0', top: 0, display: 'flex', gap: '0.5rem' }}>
           <button
             className={`btn ${role === 'customer' ? 'btn-primary' : 'btn-secondary'}`}
             style={{ fontSize: '0.75rem', padding: '0.25rem 0.75rem' }}

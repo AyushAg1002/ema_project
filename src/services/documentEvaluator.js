@@ -1,3 +1,5 @@
+import eventBus, { EventTypes, ClaimStatus, AgentActors, createStatusUpdateEvent } from './eventBus'
+
 /**
  * Agent 5: Document Evaluation Agent
  * 
@@ -36,7 +38,7 @@ export async function evaluateDocument(file, docType, claimData, apiKey) {
         const mismatches = detectMismatches(aiAnalysis, claimData, docType)
 
         // Step 5: Return comprehensive evaluation
-        return {
+        const result = {
             valid: true,
             docType: aiAnalysis.classifiedType || docType,
             status: mismatches.length > 0 ? 'mismatch' : 'validated',
@@ -44,6 +46,39 @@ export async function evaluateDocument(file, docType, claimData, apiKey) {
             mismatches: mismatches,
             timestamp: new Date().toISOString()
         }
+
+        // Emit DocumentEvaluated Event
+        eventBus.publish({
+            eventType: EventTypes.DOCUMENT_EVALUATED,
+            correlationId: claimData.id,
+            documentType: docType,
+            evaluation: result,
+            timestamp: new Date().toISOString(),
+            actor: AgentActors.DOCUMENT_EVALUATION
+        })
+
+        // Emit ClaimStatusUpdated Event
+        let newStatus = ClaimStatus.DOCUMENT_RECEIVED
+        let reason = `Document (${docType}) received and evaluated.`
+
+        if (mismatches.length > 0) {
+            newStatus = ClaimStatus.UNDER_REVIEW
+            reason = `Document mismatch detected: ${mismatches[0].type}`
+        } else {
+            reason = `Document (${docType}) validated successfully.`
+        }
+
+        const statusEvent = createStatusUpdateEvent(
+            claimData.id,
+            newStatus,
+            AgentActors.DOCUMENT_EVALUATION,
+            reason,
+            { docType, evaluationStatus: result.status }
+        )
+        eventBus.publish(statusEvent)
+        console.log('📤 AGENT 5: Emitted status update:', statusEvent)
+
+        return result
 
     } catch (error) {
         console.error('Document evaluation error:', error)

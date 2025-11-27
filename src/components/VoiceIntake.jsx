@@ -1,8 +1,9 @@
-
 import { useState, useRef, useEffect } from 'react'
 import { transcribeAudio, generateResponse, generateReport } from '../services/openai'
+import eventBus, { EventTypes, ClaimStatus, AgentActors, createStatusUpdateEvent, createClaimInitiatedEvent } from '../services/eventBus'
 
 export default function VoiceIntake({ apiKey, onComplete }) {
+    console.log('VoiceIntake rendering with props:', { apiKey: apiKey ? 'present' : 'missing', onComplete: typeof onComplete })
     const [isRecording, setIsRecording] = useState(false)
     const [messages, setMessages] = useState([
         { role: 'assistant', content: "Hello, this is Ema from Claims Processing. I'm here to help you file your claim. Can you please describe what happened?" }
@@ -11,6 +12,7 @@ export default function VoiceIntake({ apiKey, onComplete }) {
     const [isSpeaking, setIsSpeaking] = useState(false)
     const [textInput, setTextInput] = useState('')
     const [interimTranscript, setInterimTranscript] = useState('') // Show what's being captured
+    const [claimSubmitted, setClaimSubmitted] = useState(false) // Track if claim has been submitted
     const [extractedData, setExtractedData] = useState({
         incidentType: null,
         dateTime: null,
@@ -194,7 +196,7 @@ export default function VoiceIntake({ apiKey, onComplete }) {
                 } else if (event.error === 'not-allowed') {
                     alert("Microphone access denied. Please allow microphone access in your browser settings.")
                 } else {
-                    alert(`Speech recognition error: ${event.error}`)
+                    alert(`Speech recognition error: ${event.error} `)
                 }
             }
 
@@ -264,11 +266,52 @@ export default function VoiceIntake({ apiKey, onComplete }) {
 
         try {
             const data = await generateReport(msgsToUse, apiKey)
+
+            // Generate claim ID
+            const claimId = `CLM-${Date.now()}`
+
             // Agent 1: FNOL Package = AI Report + Raw Transcript
-            onComplete({
+            const claimData = {
                 ...data,
+                id: claimId,
                 transcript: msgsToUse
+            }
+
+            // Emit ClaimInitiated event
+            const claimInitiatedEvent = createClaimInitiatedEvent(
+                claimId,
+                data,
+                msgsToUse
+            )
+            eventBus.publish(claimInitiatedEvent)
+            console.log('📤 AGENT 1: Emitted ClaimInitiated:', claimInitiatedEvent)
+
+            // Emit ClaimBriefUpdated event (Agent 3)
+            eventBus.publish({
+                eventType: EventTypes.CLAIM_BRIEF_UPDATED,
+                correlationId: claimId,
+                brief: data,
+                timestamp: new Date().toISOString(),
+                actor: AgentActors.CLAIM_BRIEF
             })
+            console.log('📤 AGENT 3: Emitted ClaimBriefUpdated')
+
+            // Emit ClaimStatusUpdated event with status "Submitted"
+            const statusEvent = createStatusUpdateEvent(
+                claimId,
+                ClaimStatus.SUBMITTED,
+                AgentActors.FNOL_INTAKE,
+                'Claim successfully submitted via voice intake',
+                { extractedFields: Object.keys(data).length }
+            )
+            eventBus.publish(statusEvent)
+            console.log('📤 AGENT 1: Emitted status update:', statusEvent)
+
+            // Mark claim as submitted
+            setClaimSubmitted(true)
+
+            // Call parent callback
+            onComplete(claimData)
         } catch (error) {
             console.error("Error generating report:", error)
             alert("Failed to generate report.")
@@ -276,9 +319,44 @@ export default function VoiceIntake({ apiKey, onComplete }) {
         }
     }
 
+    const handleReset = () => {
+        setMessages([
+            { role: 'assistant', content: "Hello, this is Ema from Claims Processing. I'm here to help you file your claim. Can you please describe what happened?" }
+        ])
+        setClaimSubmitted(false)
+        setExtractedData({
+            incidentType: null,
+            dateTime: null,
+            location: null,
+            injuries: null,
+            damage: null,
+            drivable: null,
+            otherParties: null,
+            policeReport: null
+        })
+        setTextInput('')
+        setInterimTranscript('')
+        setIsProcessing(false)
+        setIsSpeaking(false)
+        setIsRecording(false)
+
+        // Stop any ongoing speech
+        if (window.speechSynthesis) {
+            window.speechSynthesis.cancel()
+        }
+
+        // Stop any ongoing recognition
+        if (recognitionRef.current && isRecording) {
+            recognitionRef.current.stop()
+        }
+    }
+
     return (
         <div className="voice-intake-container" style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%' }}>
-            <h2 style={{ marginBottom: '1rem' }}>Voice Assistant</h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+                <h2 style={{ margin: 0 }}>Voice Assistant</h2>
+                <span style={{ fontSize: '0.7rem', padding: '0.25rem 0.5rem', backgroundColor: 'hsl(var(--color-success))', color: 'white', borderRadius: 'var(--radius-sm)', fontWeight: '600' }}>🤖 AGENT 1</span>
+            </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', flex: 1 }}>
 
@@ -317,7 +395,7 @@ export default function VoiceIntake({ apiKey, onComplete }) {
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                         <button
-                            className={`btn ${isRecording ? 'btn-danger' : 'btn-primary'}`}
+                            className={`btn ${isRecording ? 'btn-danger' : 'btn-primary'} `}
                             onClick={isRecording ? stopRecording : startRecording}
                             disabled={isProcessing || isSpeaking}
                             style={{ minWidth: '150px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
@@ -382,6 +460,51 @@ export default function VoiceIntake({ apiKey, onComplete }) {
                             Send
                         </button>
                     </div>
+                    {/* Action Buttons */}
+                    <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
+                        <button
+                            className="btn btn-secondary"
+                            onClick={handleReset}
+                            style={{ flex: 1 }}
+                        >
+                            Start New Claim
+                        </button>
+                    </div>
+
+                    {/* Automatic Status Update Message - Only show after claim submitted */}
+                    {claimSubmitted && (
+                        <div style={{
+                            marginTop: '1.5rem',
+                            padding: '1rem',
+                            backgroundColor: 'hsl(var(--color-success) / 0.1)',
+                            borderRadius: 'var(--radius-md)',
+                            border: '1px solid hsl(var(--color-success) / 0.3)'
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                                <span style={{ fontSize: '1.25rem' }}>✅</span>
+                                <h4 style={{ margin: 0, color: 'hsl(var(--color-success))' }}>Response Recorded</h4>
+                                <span style={{ fontSize: '0.6rem', padding: '0.2rem 0.4rem', backgroundColor: 'hsl(var(--color-success))', color: 'white', borderRadius: 'var(--radius-sm)', fontWeight: '600' }}>🤖 AGENT 1</span>
+                            </div>
+                            <p style={{ margin: 0, fontSize: '0.9rem', color: 'hsl(var(--color-text))' }}>
+                                Thank you! We have recorded your response. Our system will automatically process your claim and update you on the status shortly.
+                            </p>
+                            <div style={{
+                                marginTop: '0.75rem',
+                                padding: '0.75rem',
+                                backgroundColor: 'hsl(var(--color-primary) / 0.1)',
+                                borderRadius: 'var(--radius-sm)',
+                                borderLeft: '3px solid hsl(var(--color-primary))'
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                                    <span style={{ fontSize: '0.9rem', fontWeight: '600', color: 'hsl(var(--color-primary))' }}>Status Updates</span>
+                                    <span style={{ fontSize: '0.6rem', padding: '0.2rem 0.4rem', backgroundColor: 'hsl(var(--color-success))', color: 'white', borderRadius: 'var(--radius-sm)', fontWeight: '600' }}>🤖 AUTO-NOTIFY AGENT</span>
+                                </div>
+                                <p style={{ margin: 0, fontSize: '0.85rem', color: 'hsl(var(--color-text-muted))' }}>
+                                    You will receive automatic updates as your claim progresses through our system.
+                                </p>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Right: Live Summary */}

@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { analyzeClaim } from '../utils/triageEngine'
 
 export default function ProcessingView({ claimData, onComplete }) {
     const [currentStep, setCurrentStep] = useState(0)
+    const hasCompleted = useRef(false)
+
     const steps = [
         'FNOL Intake Agent: Structuring data...',
         'Triage Decision Agent: Analyzing policy...',
@@ -17,8 +19,9 @@ export default function ProcessingView({ claimData, onComplete }) {
                 setCurrentStep(prev => prev + 1)
             }, 800) // 800ms per step for effect
             return () => clearTimeout(timer)
-        } else {
-            // Finished
+        } else if (!hasCompleted.current) {
+            // Finished - only run once
+            hasCompleted.current = true
             const result = analyzeClaim(claimData)
             // Small delay before finishing
             const timer = setTimeout(() => {
@@ -26,7 +29,7 @@ export default function ProcessingView({ claimData, onComplete }) {
             }, 500)
             return () => clearTimeout(timer)
         }
-    }, [currentStep, claimData, onComplete])
+    }, [currentStep, claimData, onComplete, steps.length])
 
     return (
         <div style={{ textAlign: 'center', padding: '2rem' }}>
