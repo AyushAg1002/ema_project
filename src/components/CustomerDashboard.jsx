@@ -31,7 +31,7 @@ export default function CustomerDashboard({ claims, onUploadDoc, onNewClaim, int
                 onNewClaim={onNewClaim}
             />
 
-            <div style={{ flex: 1, overflowY: 'auto', padding: '2rem' }}>
+            <div className="container" style={{ flex: 1, overflowY: 'auto' }}>
                 {activeClaim && <CustomerNotifications customerPseudonym={`cust-${activeClaim.id}`} />}
 
                 {/* Active Claim Status Tracker */}
@@ -261,14 +261,15 @@ export default function CustomerDashboard({ claims, onUploadDoc, onNewClaim, int
                     </div>
                 )}
             </div>
-            )
+        </div>
+    )
 }
 
-            function DetailRow({label, value}) {
+function DetailRow({ label, value }) {
     return (
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', borderBottom: '1px solid hsl(var(--color-border))', paddingBottom: '0.5rem' }}>
-                <span style={{ color: 'hsl(var(--color-text-muted))' }}>{label}</span>
-                <span style={{ fontWeight: '500', textAlign: 'right' }}>{value || '—'}</span>
-            </div>
-            )
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', borderBottom: '1px solid hsl(var(--color-border))', paddingBottom: '0.5rem' }}>
+            <span style={{ color: 'hsl(var(--color-text-muted))' }}>{label}</span>
+            <span style={{ fontWeight: '500', textAlign: 'right' }}>{value || '—'}</span>
+        </div>
+    )
 }
