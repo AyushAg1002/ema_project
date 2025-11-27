@@ -238,7 +238,7 @@ function App() {
         mismatchFlags: evaluation.mismatches?.map(m => m.type) || []
       }
 
-      const triageResult = analyzeClaim(updatedClaimData)
+      const triageResult = analyzeClaim(updatedClaimData, claims)
 
       const finalClaim = {
         ...updatedClaimData,
