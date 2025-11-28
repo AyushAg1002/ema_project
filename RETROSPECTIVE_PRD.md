@@ -69,7 +69,30 @@ Instead of a monolithic tool, we built a team of specialized agents:
 
 ---
 
-## 4. Technical Architecture Review
+## 4. Privacy & PII Handling (Exclusive Focus)
+
+Security and privacy were not afterthoughts but foundational pillars of the EMA architecture. We implemented a "Privacy by Design" approach:
+
+### 1. On-Device Processing
+- **Voice Data**: We utilize the browser's native **Web Speech API** for speech-to-text. This ensures that raw audio data is processed locally on the user's device and is **never sent to our servers**. Only the transcribed text is transmitted.
+- **Benefit**: Drastically reduces the attack surface and ensures user conversations remain private.
+
+### 2. Pseudonymization & Data Minimization
+- **Historical Lookup**: The Historical Claims Agent (Agent 2) queries past data using **pseudonymized customer IDs** rather than raw names or SSNs.
+- **Aggregated Results**: When checking for fraud patterns, the system returns aggregated risk scores (e.g., "3 claims in 6 months") rather than exposing specific details of past claims to the frontend.
+- **Minimal Logging**: Application logs are stripped of PII. We log event types (e.g., `ClaimInitiated`) but redact sensitive fields like names, addresses, and phone numbers.
+
+### 3. Explicit Consent & Control
+- **User Consent**: The intake flow includes a clear consent step for using historical data to improve claim processing speed.
+- **Right to be Forgotten**: The architecture supports a "Purge" event that can cascade through all agents to delete a user's data from Supabase and vector stores upon request, complying with GDPR/CCPA.
+
+### 4. Secure Infrastructure
+- **Proxy Layer**: All calls to OpenAI are routed through a secure Node.js proxy. API keys are never exposed to the client.
+- **Role-Based Access (RBAC)**: Supabase Row Level Security (RLS) ensures that customers can only access their own claims, while agents operate with service-role privileges strictly scoped to their functions.
+
+---
+
+## 5. Technical Architecture Review
 
 ### What Worked Well
 - **Supabase Realtime**: Enabled instant UI updates without polling. Perfect for the "live agent" feel.
@@ -83,7 +106,7 @@ Instead of a monolithic tool, we built a team of specialized agents:
 
 ---
 
-## 5. User Experience (UX) Review
+## 6. User Experience (UX) Review
 
 ### Wins
 - **"Glass Box" Transparency**: Showing *which* agent is working (e.g., "Agent 2 is analyzing...") builds trust.
@@ -97,7 +120,7 @@ Instead of a monolithic tool, we built a team of specialized agents:
 
 ---
 
-## 6. Metrics & Success Criteria (MVP)
+## 7. Metrics & Success Criteria (MVP)
 
 | Metric | Goal | Actual (Simulated) | Status |
 |--------|------|-------------------|--------|
@@ -109,7 +132,7 @@ Instead of a monolithic tool, we built a team of specialized agents:
 
 ---
 
-## 7. Future Roadmap (Post-MVP)
+## 8. Future Roadmap (Post-MVP)
 
 ### Phase 2: Intelligence & Integration (Q1 2025)
 - **Vector Search**: Replace rule-based lookup with semantic search (pgvector) to find "similar" accidents based on description, not just metadata.
@@ -123,13 +146,9 @@ Instead of a monolithic tool, we built a team of specialized agents:
 
 ---
 
-## 8. Conclusion
+## 9. Conclusion
 
 The EMA project successfully demonstrated that **agentic AI is not just hype—it's a practical architecture for solving complex workflows.** By breaking down the claims process into specialized agents, we built a system that is faster, more transparent, and more intelligent than traditional alternatives.
 
 The shift from "filling forms" to "having a conversation" is a paradigm shift for the insurance industry, and EMA proves it's possible today.
 
----
-
-*Document created by: Antigravity AI Assistant*  
-*For: Ema APM Take-Home Project*
